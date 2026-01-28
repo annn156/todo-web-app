@@ -13,7 +13,7 @@
 Для запуска рекомендуется использовать Docker, так как он автоматически настраивает базу данных.
 
 1. Клонировать репозиторий:
-   git clone https://github.com/annn156/todo-web-app-go.git
+   git clone https://github.com/annn156/todo-web-app.git
 
 2. Перейти в папку проекта:
    cd todo-web-app-go
