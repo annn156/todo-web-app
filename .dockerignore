@@ -1,0 +1,11 @@
+.git/
+.gitingnore
+node_modules/
+node_modules/
+*.log
+.env
+*.exe
+*.bat
+*.db
+main.exe
+

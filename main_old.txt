@@ -1,0 +1,317 @@
+/*package main
+
+import (
+	"bufio"
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	_ "github.com/lib/pq"
+)
+
+type Task struct {
+	Id        int
+	Name      string
+	Done      bool
+	CreatedAt time.Time
+} //СТРУКТУТУРА
+func connectDB() *sql.DB {
+	connStr := "user=postgres password=postgres123 dbname=todo_app sslmode=disable  "
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Print("Успешное подключение PostgreSQL!")
+	return db
+}
+
+func createTable(db *sql.DB) { // создание таблицы
+	query := `
+	CREATE TABLE IF NOT EXISTS tasks (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		done BOOLEAN DEFAULT FALSE,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+	)`
+	_, err := db.Exec(query) // выплнение
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Таблица 'tasks' успешно создана!")
+
+}
+
+// добвавление задачи -
+func addTask(db *sql.DB, name string) (int, error) {
+	var id int
+	query := "INSERT INTO tasks (name) VALUES ($1) RETURNING id"
+	err := db.QueryRow(query, name).Scan(&id) // чтение строки
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// просмотр задач
+func getAllTasks(db *sql.DB) ([]Task, error) {
+	var tasks []Task // СЛАЙС, СРЕЗ
+
+	query := "SELECT id,name, done, created_at FROM tasks ORDER BY id"
+	rows, err := db.Query(query) // чтение строк
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var task Task
+		err := rows.Scan(&task.Id, &task.Name, &task.Done, &task.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+// изменение статуса
+func completeTask(db *sql.DB, id int) error {
+	query := "UPDATE  tasks SET done = true WHERE id =$1 "
+	_, err := db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// удаление задачи
+func deleteTask(db *sql.DB, id int) error {
+	query := " DELETE FROM tasks  WHERE id =$1"
+	_, err := db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// поиск задач
+func searchTasks(db *sql.DB, word string) ([]Task, error) {
+	var tasks []Task // СЛАЙС, СРЕЗ
+
+	query := " SELECT  id,name, done, created_at FROM tasks WHERE name  ILIKE $1  "
+	searchPattern := "%" + word + "%"
+	rows, err := db.Query(query, searchPattern) // чтение строк
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var task Task
+		err := rows.Scan(&task.Id, &task.Name, &task.Done, &task.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+func main() {
+
+	db := connectDB()
+	defer db.Close()
+	createTable(db)
+
+	var choice int
+	for { // бесконечный цикл
+		fmt.Println("=== Мой To-Do List ===")
+		fmt.Println("1. Добавить задачу")
+		fmt.Println("2. Показать все задачи")
+		fmt.Println("3. Отметить выполненной")
+		fmt.Println("4. Удалить задачу")
+		fmt.Println("5.Поиск задач")
+		fmt.Println("6. Выйти")
+		fmt.Scan(&choice)
+		switch choice {
+		case 1:
+
+			fmt.Scanln()
+
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Введите название задачи: ")
+			name, _ := reader.ReadString('\n')
+			name = strings.TrimSpace(name)
+
+			id, err := addTask(db, name)
+
+			if err != nil {
+				fmt.Println("Не можем добавить задачу, ошибка соединения с бд!!!")
+				break
+			}
+
+			fmt.Println("Задача добавлена!")
+			fmt.Println("ID задачи:", id)
+			fmt.Println("Задача:", name)
+			fmt.Println("Статус: не выполнено")
+
+		case 2:
+			fmt.Println("Показать все задачи")
+
+			tasksForm, err := getAllTasks(db)
+			if err != nil {
+				fmt.Println(" ошибка соединения с бд!!!")
+				break
+			}
+			if len(tasksForm) == 0 {
+				fmt.Println("Список пуст")
+			}
+			for _, task := range tasksForm {
+				fmt.Println("ID", task.Id)
+				fmt.Println("Задача", task.Name)
+				fmt.Print("Статус: ")
+				if task.Done == false {
+					fmt.Println("Не выполнено")
+				} else {
+					fmt.Println(" выполнено")
+				}
+				fmt.Println("Дата создания:", task.CreatedAt.Format("02 Jan 2006 15:04"))
+
+			}
+
+		case 3:
+			fmt.Println("Показать все задачи")
+
+			tasksForm, err := getAllTasks(db)
+			if err != nil {
+				fmt.Println(" ошибка соединения с бд!!!")
+				break
+			}
+			if len(tasksForm) == 0 {
+				fmt.Println("Список пуст")
+			}
+			for _, task := range tasksForm {
+				fmt.Println("ID", task.Id)
+				fmt.Println("Задача", task.Name)
+				fmt.Print("Статус: ")
+				if task.Done == false {
+					fmt.Println("Не выполнено")
+				} else {
+					fmt.Println(" выполнено")
+				}
+				fmt.Println("Дата создания:", task.CreatedAt.Format("02 Jan 2006 15:04"))
+
+			}
+			fmt.Println("Отметить выполненной")
+			fmt.Scanln()
+			var taskIDid int
+
+			_, err = fmt.Scanln(&taskIDid)
+			if err != nil {
+				fmt.Println(" Ошибка ввода. Пожалуйста, введите число.")
+				break
+			}
+			err = completeTask(db, taskIDid)
+			if err != nil {
+				fmt.Printf("Не могу отметить задачу с ID %d: %v\n", taskIDid, err)
+				break
+			}
+
+			fmt.Println("Задача отмечена выполненной!")
+
+		case 4:
+			fmt.Println("Удалить задачу")
+			tasksForm, err := getAllTasks(db)
+			if err != nil {
+				fmt.Println(" ошибка соединения с бд!!!")
+				break
+			}
+			if len(tasksForm) == 0 {
+				fmt.Println("Список пуст")
+				break
+			}
+			for _, task := range tasksForm {
+				fmt.Println("ID", task.Id)
+				fmt.Println("Задача", task.Name)
+				fmt.Print("Статус: ")
+				if task.Done == false {
+					fmt.Println("Не выполнено")
+				} else {
+					fmt.Println(" выполнено")
+				}
+				fmt.Println("Дата создания:", task.CreatedAt.Format("02 Jan 2006 15:04"))
+
+			}
+
+			fmt.Println("Выберити задчу ")
+			fmt.Scanln()
+			var taskID int
+
+			_, err = fmt.Scanln(&taskID)
+			if err != nil {
+				fmt.Println(" Ошибка ввода. Пожалуйста, введите число.")
+				break
+			}
+
+			err = deleteTask(db, taskID)
+			if err != nil {
+				fmt.Print(" не можем удалить задачу")
+				break
+			}
+
+			fmt.Println("Задача удалена!")
+
+		case 5:
+			fmt.Println("Поиск задачи")
+			fmt.Scanln()
+			fmt.Println("Введите текст:")
+			var words string
+
+			reader := bufio.NewReader(os.Stdin)
+			words, _ = reader.ReadString('\n')
+			words = strings.TrimSpace(words)
+
+			tasksFormSerch, err := searchTasks(db, words)
+			if err != nil {
+				fmt.Println(" Ошибка поиска:", err)
+				break
+			}
+			if len(tasksFormSerch) == 0 {
+				fmt.Println("Список пуст")
+				break
+			}
+			for _, task := range tasksFormSerch {
+				fmt.Println("ID", task.Id)
+				fmt.Println("Задача", task.Name)
+				fmt.Print("Статус: ")
+				if task.Done == false {
+					fmt.Println("Не выполнено")
+				} else {
+					fmt.Println(" выполнено")
+				}
+				fmt.Println("Дата создания:", task.CreatedAt.Format("02 Jan 2006 15:04"))
+
+			}
+
+		case 6:
+			return
+		}
+
+	}
+
+} */
